@@ -4,3 +4,4 @@ __pycache__/
 .ipynb_checkpoints/
 data/raw/
 results/dummy_test.csv
+results/dummy_optuna.csv

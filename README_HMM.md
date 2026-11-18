@@ -79,3 +79,9 @@ The gap threshold is 30 seconds. The transition parameters above were selected
 using training out-of-fold predictions only; student-test was used for the
 reported development evaluation and not for tuning. Never use evaluator-test
 data to tune parameters.
+
+## Two-laptop evaluator UI
+
+The evaluator dashboard in `ui/` can run on a separate laptop and fetch saved
+trip metrics and maps from the API in `api/`. Follow `ui/README.md`; the API
+serves precomputed outputs and does not run fresh model inference.

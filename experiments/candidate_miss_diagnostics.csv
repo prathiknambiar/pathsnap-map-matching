@@ -1,0 +1,4 @@
+trip_id,observations,misses,miss_rate_percent,missing_candidate_observations,mean_nearest_candidate_m,p95_nearest_candidate_m,mean_reference_distance_m,p95_reference_distance_m
+00000033,5844,3875,66.3073,0,9.393,30.207,80.913,142.059
+00000054,19313,16771,86.8379,0,73.439,100.664,131.931,210.051
+00000072,969,136,14.0351,0,5.163,12.847,6.21,13.893

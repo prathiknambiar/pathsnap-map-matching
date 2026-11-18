@@ -8,6 +8,7 @@ from sklearn.metrics import f1_score, log_loss, precision_score, recall_score
 SEED = 42
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 DEFAULT_LOG = os.path.join(RESULTS_DIR, "model_comparison.csv")
+METRICS = ["macro_f1", "precision", "recall", "log_loss", "top1"]
 
 
 def top1_accuracy(meta, proba):
@@ -35,23 +36,37 @@ def evaluate(model, X, y, meta):
 
 def run_experiment(name, family, make_model, train, test, feats,
                    n_splits=5, log_path=DEFAULT_LOG):
-    X, y, g = train[feats], train["label"], train["trip_id"]
+    X, y, g = train[feats], train["label"].astype(int), train["trip_id"]
 
-    cv_f1 = []
+    folds = []
     for tr, va in GroupKFold(n_splits=n_splits).split(X, y, g):
         m = make_model()
         m.fit(X.iloc[tr], y.iloc[tr])
-        cv_f1.append(evaluate(m, X.iloc[va], y.iloc[va], train.iloc[va])["macro_f1"])
+        folds.append(evaluate(m, X.iloc[va], y.iloc[va], train.iloc[va]))
+    cv = pd.DataFrame(folds)
 
     t = time.time()
     final = make_model()
     final.fit(X, y)
     train_time = time.time() - t
 
-    res = evaluate(final, test[feats], test["label"], test)
+    if test["label"].notna().all():
+        res = evaluate(final, test[feats], test["label"].astype(int), test)
+    else:
+        # test labels are hidden: no test metrics, only the timing
+        t = time.time()
+        final.predict_proba(test[feats])
+        res = {k: np.nan for k in METRICS}
+        res["infer_time"] = time.time() - t
+
     res.update({
         "model": name, "family": family,
-        "cv_macro_f1": float(np.mean(cv_f1)), "cv_std": float(np.std(cv_f1)),
+        "cv_macro_f1": float(cv["macro_f1"].mean()),
+        "cv_std": float(np.std(cv["macro_f1"])),
+        "cv_precision": float(cv["precision"].mean()),
+        "cv_recall": float(cv["recall"].mean()),
+        "cv_log_loss": float(cv["log_loss"].mean()),
+        "cv_top1": float(cv["top1"].mean()),
         "train_time": train_time, "seed": SEED,
     })
 

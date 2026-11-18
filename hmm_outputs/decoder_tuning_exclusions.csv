@@ -1,0 +1,7 @@
+trip_id,max_alignment_distance_m,candidate_miss_rate,reason
+00000002,569.485,0.11404114317271849,alignment_distance_over_250m
+00000019,294.938,0.0237892948173322,alignment_distance_over_250m
+00000033,160.413,0.6654688569472964,candidate_miss_rate_over_10pct
+00000054,240.757,0.887899342411847,candidate_miss_rate_over_10pct
+00000066,644.629,0.045780346820809246,alignment_distance_over_250m
+00000072,37.518,0.1568627450980392,candidate_miss_rate_over_10pct

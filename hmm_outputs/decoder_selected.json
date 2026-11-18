@@ -1,0 +1,51 @@
+{
+  "selected_config": {
+    "max_hops": 6,
+    "meters_per_hop": 80.0,
+    "distance_tolerance_m": 150.0,
+    "distance_scale_m": 75.0,
+    "disconnected_penalty": -20.0
+  },
+  "selected_name": "strong_transitions",
+  "selection_objective": "mean per-trip HMM Macro F1 on eligible train OOF trips",
+  "eligible_training_trips": 74,
+  "excluded_trips": [
+    {
+      "trip_id": "00000002",
+      "max_alignment_distance_m": 569.485,
+      "candidate_miss_rate": 0.11404114317271849,
+      "reason": "alignment_distance_over_250m"
+    },
+    {
+      "trip_id": "00000019",
+      "max_alignment_distance_m": 294.938,
+      "candidate_miss_rate": 0.0237892948173322,
+      "reason": "alignment_distance_over_250m"
+    },
+    {
+      "trip_id": "00000033",
+      "max_alignment_distance_m": 160.413,
+      "candidate_miss_rate": 0.6654688569472964,
+      "reason": "candidate_miss_rate_over_10pct"
+    },
+    {
+      "trip_id": "00000054",
+      "max_alignment_distance_m": 240.757,
+      "candidate_miss_rate": 0.887899342411847,
+      "reason": "candidate_miss_rate_over_10pct"
+    },
+    {
+      "trip_id": "00000066",
+      "max_alignment_distance_m": 644.629,
+      "candidate_miss_rate": 0.045780346820809246,
+      "reason": "alignment_distance_over_250m"
+    },
+    {
+      "trip_id": "00000072",
+      "max_alignment_distance_m": 37.518,
+      "candidate_miss_rate": 0.1568627450980392,
+      "reason": "candidate_miss_rate_over_10pct"
+    }
+  ],
+  "note": "Selected on train OOF predictions only; student-test was not used for tuning."
+}

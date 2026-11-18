@@ -5,7 +5,8 @@ branch, using a per-trip local equirectangular projection (metre scale) so the
 script only needs NumPy. It creates derived development labels, not independently
 verified ground truth. Review large alignment distances before reporting scores.
 
-    python align_student_test_labels.py
+    python align_student_test_labels.py --partition student_test
+    python align_student_test_labels.py --partition train
 
 Outputs:
     Dataset/student_test_observation_labels.csv
@@ -16,16 +17,13 @@ from __future__ import annotations
 
 import csv
 import math
+import argparse
 from pathlib import Path
 
 import numpy as np
 
 
 ROOT = Path(__file__).resolve().parent
-DATA_ROOT = ROOT / "Student folder" / "student_test"
-CANDIDATE_FILE = ROOT / "Dataset" / "candidates_student_test.csv"
-LABEL_FILE = ROOT / "Dataset" / "student_test_observation_labels.csv"
-REPORT_FILE = ROOT / "Dataset" / "student_test_label_alignment_report.csv"
 REVIEW_DISTANCE_M = 250.0
 EARTH_RADIUS_M = 6_371_000.0
 
@@ -67,8 +65,8 @@ def align_track_to_route(track: np.ndarray, nodes: np.ndarray,
 
     n_points, n_route = len(track), len(route)
     previous = np.full(n_route, np.inf, dtype=np.float64)
-    back = np.zeros((n_points, n_route), dtype=np.int32)
-    point_distances = np.zeros((n_points, n_route), dtype=np.float32)
+    back_dtype = np.uint16 if n_route < np.iinfo(np.uint16).max else np.uint32
+    back = np.zeros((n_points, n_route), dtype=back_dtype)
 
     for i in range(n_points):
         t = np.zeros(n_route, dtype=np.float64)
@@ -77,7 +75,6 @@ def align_track_to_route(track: np.ndarray, nodes: np.ndarray,
         np.clip(t, 0.0, 1.0, out=t)
         qx, qy = ax + t * dx, ay + t * dy
         d2 = (gps_x[i] - qx) ** 2 + (gps_y[i] - qy) ** 2
-        point_distances[i] = np.sqrt(d2)
         if i == 0:
             previous = d2
             continue
@@ -96,12 +93,27 @@ def align_track_to_route(track: np.ndarray, nodes: np.ndarray,
     positions[-1] = int(np.argmin(previous))
     for i in range(n_points - 1, 0, -1):
         positions[i - 1] = back[i, positions[i]]
-    return route[positions].astype(np.int64), point_distances[np.arange(n_points), positions]
+    # Recompute only the selected point-to-arc distances, avoiding an n_points x
+    # n_route distance matrix for long training trips.
+    selected_arcs = route[positions].astype(np.int64)
+    selected = arcs[selected_arcs]
+    sx, sy = node_x[selected[:, 0]], node_y[selected[:, 0]]
+    ex, ey = node_x[selected[:, 1]], node_y[selected[:, 1]]
+    vx, vy = ex - sx, ey - sy
+    denom = vx * vx + vy * vy
+    t = np.zeros(n_points, dtype=np.float64)
+    valid = denom > 0
+    t[valid] = ((gps_x[valid] - sx[valid]) * vx[valid]
+                + (gps_y[valid] - sy[valid]) * vy[valid]) / denom[valid]
+    np.clip(t, 0.0, 1.0, out=t)
+    qx, qy = sx + t * vx, sy + t * vy
+    selected_distances = np.sqrt((gps_x - qx) ** 2 + (gps_y - qy) ** 2)
+    return selected_arcs, selected_distances
 
 
-def read_candidates():
+def read_candidates(candidate_file: Path):
     candidates = {}
-    with CANDIDATE_FILE.open(newline="", encoding="utf-8") as f:
+    with candidate_file.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             trip_id = str(row["trip_id"]).zfill(8)
             key = (trip_id, int(row["observation_id"]))
@@ -110,9 +122,18 @@ def read_candidates():
 
 
 def main():
-    candidates = read_candidates()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--partition", choices=("train", "student_test"), default="student_test")
+    parser.add_argument("--root", type=Path, default=ROOT)
+    args = parser.parse_args()
+    data_root = args.root / "Student folder" / args.partition
+    candidate_file = args.root / "Dataset" / f"candidates_{args.partition}.csv"
+    label_file = args.root / "Dataset" / f"{args.partition}_observation_labels.csv"
+    report_file = args.root / "Dataset" / f"{args.partition}_label_alignment_report.csv"
+
+    candidates = read_candidates(candidate_file)
     label_rows, report_rows = [], []
-    trip_dirs = sorted((p for p in DATA_ROOT.iterdir() if p.is_dir()), key=lambda p: int(p.name))
+    trip_dirs = sorted((p for p in data_root.iterdir() if p.is_dir()), key=lambda p: int(p.name))
     for folder in trip_dirs:
         trip_id = folder.name
         track = load_rows(folder / f"{trip_id}.track", ["lon", "lat", "time"])
@@ -159,14 +180,14 @@ def main():
         print(f"{trip_id}: {len(track):,} observations; max route distance {maximum:.1f} m; "
               f"candidate misses {candidate_misses:,}/{candidate_observations:,}")
 
-    for path, rows in ((LABEL_FILE, label_rows), (REPORT_FILE, report_rows)):
+    for path, rows in ((label_file, label_rows), (report_file, report_rows)):
         with path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
-    print(f"\nWrote labels: {LABEL_FILE}")
-    print(f"Wrote alignment diagnostics: {REPORT_FILE}")
-    print("These are derived student-test development labels; inspect review_distance trips before reporting metrics.")
+    print(f"\nWrote labels: {label_file}")
+    print(f"Wrote alignment diagnostics: {report_file}")
+    print(f"These are derived {args.partition} labels; inspect review_distance trips before reporting metrics.")
 
 
 if __name__ == "__main__":

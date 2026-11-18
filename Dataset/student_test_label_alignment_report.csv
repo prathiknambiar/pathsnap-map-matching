@@ -1,0 +1,11 @@
+trip_id,observations,route_arcs,observations_with_candidate,aligned_arc_in_candidate_set,candidate_label_misses,candidate_miss_rate,median_alignment_distance_m,p95_alignment_distance_m,max_alignment_distance_m,alignment_status
+00000000,2503,179,2503,2498,5,0.001997602876548142,6.052,16.627,36.095,generated_monotonic_alignment
+00000007,1354,123,1354,1354,0,0.0,4.511,26.122,36.818,generated_monotonic_alignment
+00000009,1049,429,1049,1029,20,0.019065776930409915,4.707,18.135,47.256,generated_monotonic_alignment
+00000040,2995,309,2995,2995,0,0.0,4.905,14.909,43.616,generated_monotonic_alignment
+00000052,262,95,262,262,0,0.0,4.167,12.645,19.059,generated_monotonic_alignment
+00000056,3958,1323,3958,3938,20,0.005053057099545225,4.784,14.494,157.851,generated_monotonic_alignment
+00000065,768,145,768,767,1,0.0013020833333333333,4.397,11.752,21.767,generated_monotonic_alignment
+00000076,1486,374,1486,1475,11,0.007402422611036339,6.828,18.658,32.222,generated_monotonic_alignment
+00000077,3911,268,3911,3901,10,0.0025568908207619537,6.1,18.426,37.248,generated_monotonic_alignment
+00000091,874,232,874,874,0,0.0,4.386,12.482,22.865,generated_monotonic_alignment

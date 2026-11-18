@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PathSnap | Route evaluator</title>
+  <style>
+    :root { color-scheme: light; --ink:#17211f; --muted:#62716c; --line:#dce5e1; --paper:#f5f8f6; --green:#147d62; --blue:#2563eb; --orange:#e87532; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif }
+    header { padding:26px max(22px,calc((100vw - 1320px)/2)); background:#102d27; color:#fff }
+    header .eyebrow { margin:0 0 5px; color:#9bd4bd; font-size:12px; font-weight:700; letter-spacing:.13em; text-transform:uppercase }
+    h1 { margin:0; font-size:clamp(25px,4vw,38px); letter-spacing:-.03em }
+    header p:last-child { margin:7px 0 0; color:#d1e2dc }
+    main { max-width:1320px; margin:24px auto; padding:0 20px 32px }
+    .toolbar { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:16px; flex-wrap:wrap }
+    label { display:grid; gap:6px; color:var(--muted); font-size:13px; font-weight:650 }
+    select,input { min-width:220px; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); font:inherit }
+    button { padding:10px 15px; border:0; border-radius:9px; background:var(--green); color:#fff; font:inherit; font-weight:700; cursor:pointer }
+    .status { color:var(--muted); font-size:13px }
+    .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:16px }
+    .card,.panel { border:1px solid var(--line); border-radius:13px; background:#fff; box-shadow:0 2px 8px #18372e08 }
+    .card { padding:15px 17px }
+    .card span { display:block; color:var(--muted); font-size:12px; font-weight:650 }
+    .card strong { display:block; margin-top:6px; font-size:25px; letter-spacing:-.03em }
+    .card small { display:block; margin-top:2px; color:var(--muted) }
+    .layout { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:16px; align-items:start }
+    .panel { overflow:hidden }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 17px; border-bottom:1px solid var(--line) }
+    h2 { margin:0; font-size:16px }
+    .legend { display:flex; gap:12px; flex-wrap:wrap; color:var(--muted); font-size:12px }
+    .dot { display:inline-block; width:9px;height:9px;border-radius:50%; margin-right:5px }
+    iframe { display:block; width:100%; height:min(70vh,690px); min-height:470px; border:0; background:#e6ece9 }
+    .metrics { padding:16px }
+    table { width:100%; border-collapse:collapse; font-size:13px }
+    th,td { padding:9px 6px; border-bottom:1px solid #edf1ef; text-align:right }
+    th:first-child,td:first-child { text-align:left }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em }
+    .hmm { color:var(--green); font-weight:700 }
+    .positive { color:var(--green); font-weight:700 }
+    .note { padding:13px 16px; color:var(--muted); font-size:12px }
+    .about { padding:17px; color:var(--muted); font-size:13px }
+    .about p { margin:0 0 12px }
+    .about p:last-child { margin-bottom:0 }
+    .error { margin:16px 0; padding:12px 14px; border:1px solid #f0c9b7; border-radius:10px; background:#fff5ef; color:#8f3a16 }
+    @media(max-width:900px){.layout{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:520px){main{padding:0 12px 24px}.cards{gap:8px}.card{padding:12px}.card strong{font-size:21px}.toolbar{align-items:start;flex-direction:column}select{width:100%}.panel-head{align-items:start;flex-direction:column}iframe{min-height:420px;height:60vh}}
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">PathSnap · Route reconstruction</p>
+    <h1>Trip evaluator</h1>
+    <p>Compare classifier-only predictions with HMM/Viterbi route decoding.</p>
+  </header>
+  <main>
+    <div id="error" class="error" hidden></div>
+    <div class="toolbar">
+      <label for="api-url">Backend API URL<input id="api-url" aria-label="Backend API URL" placeholder="http://192.168.1.10:8001/api"></label>
+      <button id="connect">Connect</button>
+      <label for="trip">Evaluation trip<select id="trip" aria-label="Select evaluation trip" disabled></select></label>
+      <div class="status" id="status">Loading evaluation results…</div>
+    </div>
+    <section class="cards" aria-label="Selected trip metrics">
+      <article class="card"><span>HMM Macro F1</span><strong id="f1">—</strong><small id="f1delta">Compared with classifier</small></article>
+      <article class="card"><span>HMM Top-1 accuracy</span><strong id="accuracy">—</strong><small id="accdelta">Compared with classifier</small></article>
+      <article class="card"><span>Direct route continuity</span><strong id="continuity">—</strong><small>HMM predicted transitions</small></article>
+      <article class="card"><span>Inference time</span><strong id="time">—</strong><small>Includes data loading</small></article>
+    </section>
+    <section class="layout">
+      <article class="panel">
+        <div class="panel-head"><h2 id="maptitle">Route comparison</h2><div class="legend"><span><i class="dot" style="background:#2563eb"></i>GPS</span><span><i class="dot" style="background:#e87532"></i>Classifier</span><span><i class="dot" style="background:#147d62"></i>HMM/Viterbi</span></div></div>
+        <iframe id="map" title="Interactive route comparison map" src="about:blank"></iframe>
+        <div class="note">Use the map layer control to toggle GPS observations, road network, reference route, classifier output, and HMM/Viterbi output.</div>
+      </article>
+      <aside>
+        <article class="panel">
+          <div class="panel-head"><h2>Classifier vs HMM</h2></div>
+          <div class="metrics"><table><thead><tr><th>Metric</th><th>Classifier</th><th>HMM</th></tr></thead><tbody>
+            <tr><td>Macro F1</td><td id="clf-f1">—</td><td id="hmm-f1" class="hmm">—</td></tr>
+            <tr><td>Top-1 accuracy</td><td id="clf-acc">—</td><td id="hmm-acc" class="hmm">—</td></tr>
+            <tr><td>Direct continuity</td><td id="clf-cont">—</td><td id="hmm-cont" class="hmm">—</td></tr>
+            <tr><td>Reachable ≤6 hops</td><td id="clf-reach">—</td><td id="hmm-reach" class="hmm">—</td></tr>
+          </tbody></table></div>
+        </article>
+        <article class="panel" style="margin-top:16px"><div class="panel-head"><h2>About this evaluation</h2></div><div class="about">
+          <p>HMM emissions use the classifier’s candidate-arc scores. Viterbi decoding combines those scores with road-network connectivity and distance between observations.</p>
+          <p>Displayed accuracy and F1 use route-alignment-derived proxy labels. They are not independently verified ground truth.</p>
+          <p>Metrics are calculated per trip. Select a trip above to inspect its route and scores.</p>
+        </div></article>
+      </aside>
+    </section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    const queryApi = new URLSearchParams(location.search).get('api');
+    $('api-url').value=queryApi || localStorage.getItem('pathsnap_api_url') || 'http://localhost:8001/api';
+    const percent = x => Number.isFinite(+x) ? `${(+x * 100).toFixed(1)}%` : '—';
+    const delta = (a,b) => Number.isFinite(+a) && Number.isFinite(+b) ? `${(+b- +a >= 0 ? '+' : '')}${((+b- +a)*100).toFixed(1)} pp vs classifier` : 'Compared with classifier';
+    function parseCSV(text) {
+      const lines=text.trim().split(/\r?\n/); if(lines.length<2) return [];
+      const parseLine=line=>{const cells=[];let value='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'&&line[i+1]==='"'&&quoted){value+='"';i++;}else if(c==='"'){quoted=!quoted;}else if(c===','&&!quoted){cells.push(value);value='';}else value+=c;}cells.push(value);return cells;};
+      const headers=parseLine(lines[0]);return lines.slice(1).filter(Boolean).map(line=>Object.fromEntries(parseLine(line).map((v,i)=>[headers[i],v])));
+    }
+    function put(id,value){$(id).textContent=value;}
+    function show(row){
+      const id=row.trip_id; const clfF=+row.classifier_macro_f1,hmmF=+row.hmm_macro_f1,clfA=+row.classifier_top1_accuracy,hmmA=+row.hmm_top1_accuracy;
+      put('f1',percent(hmmF));put('f1delta',delta(clfF,hmmF));put('accuracy',percent(hmmA));put('accdelta',delta(clfA,hmmA));
+      put('continuity',percent(+row.hmm_direct_continuity));put('time',Number.isFinite(+row.inference_seconds_including_data_load)?`${(+row.inference_seconds_including_data_load).toFixed(2)} s`:'—');
+      put('clf-f1',percent(clfF));put('hmm-f1',percent(hmmF));put('clf-acc',percent(clfA));put('hmm-acc',percent(hmmA));put('clf-cont',percent(+row.classifier_direct_continuity));put('hmm-cont',percent(+row.hmm_direct_continuity));put('clf-reach',percent(+row.classifier_reachable_continuity));put('hmm-reach',percent(+row.hmm_reachable_continuity));
+      put('maptitle',`Trip ${id} · route comparison`);const frame=$('map');frame.src=`${$('api-url').value.replace(/\/$/,'')}/trips/${id}/map`;
+      $('error').hidden=true;put('status',`${Number(row.gps_observations).toLocaleString()} GPS observations · ${Number(row.labeled_observations).toLocaleString()} labeled observations`);
+    }
+    async function start(){
+      const base=$('api-url').value.trim().replace(/\/$/,'');
+      if(!base){$('error').hidden=false;$('error').textContent='Enter the backend API address, such as http://192.168.1.10:8001/api.';return;}
+      localStorage.setItem('pathsnap_api_url',base);
+      try{
+        const response=await fetch(`${base}/trips`);if(!response.ok)throw new Error(`Backend returned HTTP ${response.status}`);
+        const rows=await response.json();if(!rows.length)throw new Error('The backend has no trip results. Run run_hmm.py on the backend laptop.');
+        const select=$('trip');select.replaceChildren();rows.forEach(row=>{const option=document.createElement('option');option.value=row.trip_id;option.textContent=`Trip ${row.trip_id}`;select.append(option);});
+        select.disabled=false;await loadTrip(select.value);
+      }catch(err){$('error').hidden=false;$('error').textContent=`Could not reach ${base}. Check that the backend is running, the address is correct, and both laptops are on the same network. Details: ${err.message}`;put('status','Backend unavailable');}
+    }
+    async function loadTrip(id){try{const base=$('api-url').value.trim().replace(/\/$/,'');const response=await fetch(`${base}/trips/${id}`);if(!response.ok)throw new Error(`HTTP ${response.status}`);const row=await response.json();show(row);}catch(err){$('error').hidden=false;$('error').textContent=`Could not load trip ${id} from the backend: ${err.message}`;}}
+    $('connect').addEventListener('click',start);
+    $('trip').addEventListener('change',event=>loadTrip(event.target.value));
+    if(queryApi)start();
+  </script>
+</body>
+</html>
